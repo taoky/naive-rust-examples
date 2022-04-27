@@ -4,16 +4,16 @@ use std::{
     io::{self, BufRead},
 };
 
+use clap::Parser;
 use regex::Regex;
 use walkdir::WalkDir;
-use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Path of ports
     #[clap(short, long)]
-    path: String
+    path: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
