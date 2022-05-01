@@ -58,25 +58,6 @@ impl<T> LinkedList<T> {
         self.remove_next_at(None)
     }
 
-    pub fn iter(&self) -> Iter<T> {
-        Iter {
-            llist: self,
-            next: self.head,
-        }
-    }
-
-    pub fn into_iter(&mut self) -> IntoIter<T> {
-        IntoIter { llist: self }
-    }
-
-    pub fn iter_mut(&mut self) -> IterMut<T> {
-        let head = self.head;
-        IterMut {
-            llist: self,
-            next: head,
-        }
-    }
-
     fn insert_next_at(&mut self, current: Option<usize>, value: T) {
         assert!(self.len < self.capacity);
         let next = match current {
@@ -141,6 +122,15 @@ pub struct Iter<'a, T: 'a> {
     next: Option<usize>,
 }
 
+impl<T> LinkedList<T> {
+    pub fn iter(&self) -> Iter<T> {
+        Iter {
+            llist: self,
+            next: self.head,
+        }
+    }
+}
+
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
@@ -156,11 +146,19 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-pub struct IntoIter<'a, T: 'a> {
-    llist: &'a mut LinkedList<T>,
+pub struct IntoIter<T> {
+    llist: LinkedList<T>,
 }
 
-impl<'a, T> Iterator for IntoIter<'a, T> {
+// ignoring std::iter::IntoIterator for simplicity
+#[allow(clippy::should_implement_trait)]
+impl<T> LinkedList<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter { llist: self }
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -171,6 +169,16 @@ impl<'a, T> Iterator for IntoIter<'a, T> {
 pub struct IterMut<'a, T: 'a> {
     llist: &'a mut LinkedList<T>,
     next: Option<usize>,
+}
+
+impl<T> LinkedList<T> {
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        let head = self.head;
+        IterMut {
+            llist: self,
+            next: head,
+        }
+    }
 }
 
 // impl<'a, T> IterMut<'a, T> {
@@ -288,7 +296,7 @@ mod tests {
 
     #[test]
     fn into_iter() {
-        let mut llist = init_llist();
+        let llist = init_llist();
         let mut iter = llist.into_iter();
         assert_eq!(iter.next(), Some(3));
         assert_eq!(iter.next(), Some(2));
