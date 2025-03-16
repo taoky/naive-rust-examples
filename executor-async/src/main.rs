@@ -1,13 +1,13 @@
-use async_std::{
-    io::{prelude::BufReadExt, BufReader},
-    prelude::StreamExt,
-    process::{exit, Command, Stdio},
-};
 use clap::{Arg, Command as ClapCommand};
-use std::error::Error;
+use tokio::io::AsyncBufReadExt;
+use tokio::task::JoinHandle;
 use std::os::unix::process::ExitStatusExt;
+use std::{
+    error::Error,
+    process::{exit, Stdio},
+};
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let matches = ClapCommand::new("executor")
         .trailing_var_arg(true)
@@ -26,38 +26,36 @@ async fn main() -> Result<(), Box<dyn Error>> {
         joined = program.join(" ");
         program = vec!["/bin/sh", "-c", joined.as_str()];
     }
-    let mut process = Command::new(program[0])
+    let mut process = tokio::process::Command::new(program[0])
         .args(&program[1..])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
     let pid = process.id();
-    let displayed_name = format!("{:?} {}", program, pid);
+    let displayed_name = format!("{:?} {}", program, pid.unwrap_or(0));
     let stdout = process.stdout.take().unwrap();
     let stderr = process.stderr.take().unwrap();
     // thread for stdout and stderr
     let name = displayed_name.clone();
-    let stdout = async_std::task::spawn(async move {
-        let reader = BufReader::new(stdout);
-        reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .for_each(|line| {
-                println!("{} stdout: {}", displayed_name, line);
-            }).await;
+    let stdout: JoinHandle<Result<(), tokio::io::Error>> = tokio::spawn(async move {
+        let reader = tokio::io::BufReader::new(stdout);
+        let mut lines = reader.lines();
+        while let Some(line) = lines.next_line().await? {
+            println!("{} stdout: {}", displayed_name, line);
+        }
+        Ok(())
     });
-    let stderr = async_std::task::spawn(async move {
-        let reader = BufReader::new(stderr);
-        reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .for_each(|line| {
-                println!("{} stderr: {}", name, line);
-            }).await;
+    let stderr: JoinHandle<Result<(), tokio::io::Error>> = tokio::spawn(async move {
+        let reader = tokio::io::BufReader::new(stderr);
+        let mut lines = reader.lines();
+        while let Some(line) = lines.next_line().await? {
+            println!("{} stderr: {}", name, line);
+        }
+        Ok(())
     });
-    stdout.await;
-    stderr.await;
-    let return_code = process.status().await?;
+    let _ = stdout.await?;
+    let _ = stderr.await?;
+    let return_code = process.wait().await?;
     exit(match return_code.code() {
         Some(code) => code,
         None => 128 + return_code.signal().unwrap(),

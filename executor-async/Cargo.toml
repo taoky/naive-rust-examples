@@ -7,7 +7,4 @@ edition = "2021"
 
 [dependencies]
 clap = "3"
-
-[dependencies.async-std]
-version = "1.7.0"
-features = ["attributes", "unstable"]
+tokio = { version = "1", features = ["full"] }
